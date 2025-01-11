@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from web3 import Web3
 
 from stores.models import Store, Prepay, UserPrepayRelease
+from users.models import User
 from stores.serializers import PublicStoreSerializer, PrivateStoreSerializer, MyStoreSerializer
 
 
@@ -79,8 +80,8 @@ class PrepayAddHookAPI(APIView):
             decoded = w3.codec.decode(abi_types, bytes.fromhex(data[2:]))
             
             # address 타입에 0x prefix 추가
-            signer_address = f"0x{decoded[1]}"
-            store_address = f"0x{decoded[5]}"
+            signer_address = f"{decoded[1]}"
+            store_address = f"{decoded[5]}"
             
             return {
                 'store_name': decoded[0],
@@ -116,11 +117,22 @@ class PrepayAddHookAPI(APIView):
                     'address': 'seoul, korea'  # default 값 설정
                 }
             )
+
+            print(decoded_data['signer'])
+            
+            # User 조회
+            try:
+                user = User.objects.get(wallet_address=decoded_data['signer'])
+            except User.DoesNotExist:
+                return Response({
+                    'status': 'error',
+                    'message': f"User not found with wallet address: {decoded_data['signer']}"
+                }, status=404)
             
             # Prepay 레코드 조회 또는 생성
             prepay, prepay_created = Prepay.objects.get_or_create(
                 store=store,
-                user__wallet_address=decoded_data['signer'],
+                user=user,
                 type=decoded_data['record_type'],
                 defaults={
                     'credit': decoded_data['new_total']
@@ -171,7 +183,7 @@ class PrepayUseHookAPI(APIView):
             decoded = w3.codec.decode(abi_types, bytes.fromhex(data[2:]))
             
             # address 타입에 0x prefix 추가
-            signer_address = f"0x{decoded[1]}"
+            signer_address = f"{decoded[1]}"
             
             return {
                 'store_name': decoded[0],
