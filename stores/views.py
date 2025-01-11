@@ -3,6 +3,7 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from web3 import Web3
 
 from stores.models import Store, Prepay, UserPrepayRelease
 from stores.serializers import PublicStoreSerializer, PrivateStoreSerializer, MyStoreSerializer
@@ -53,3 +54,144 @@ class PrepayIsValidAPI(APIView):
 
         is_valid = Prepay.objects.filter(id=prepay_id, code=code).exists()
         return Response({'is_valid': is_valid})
+
+
+class PrepayAddHookAPI(APIView):
+    permission_classes = []  # 외부 웹훅 접근을 위해 인증 제외
+    
+    def decode_log_data(self, data: str):
+        # ABI 타입 정의
+        abi_types = [
+            "string",      # store_name
+            "address",     # signer
+            "string",      # record_type
+            "uint256",     # credit
+            "uint256",     # new_total
+            "address"      # store
+        ]
+        
+        # web3 인스턴스 생성
+        w3 = Web3()
+        
+        # 데이터 디코딩
+        try:
+            # 0x 제거 후 디코딩
+            decoded = w3.codec.decode(abi_types, bytes.fromhex(data[2:]))
+            
+            # address 타입에 0x prefix 추가
+            signer_address = f"0x{decoded[1]}"
+            store_address = f"0x{decoded[5]}"
+            
+            return {
+                'store_name': decoded[0],
+                'signer': signer_address,
+                'record_type': decoded[2],
+                'credit': decoded[3],
+                'new_total': decoded[4],
+                'store_address': store_address
+            }
+        except Exception as e:
+            raise ValueError(f"Failed to decode data: {str(e)}")
+    
+    def post(self, request):
+        try:
+            data = request.data
+            
+            # 웹훅 데이터 검증
+            if not data.get('event') or not data['event'].get('messages'):
+                raise ValueError("Invalid webhook data format")
+            
+            # 첫 번째 메시지의 데이터 추출
+            message = data['event']['messages'][0]
+            hex_data = message['data']
+            
+            # 데이터 디코딩
+            decoded_data = self.decode_log_data(hex_data)
+            
+            # TODO: 디코딩된 데이터를 사용하여 Prepay 객체 생성
+            # store = Store.objects.get(wallet_address=decoded_data['store_address'])
+            # Prepay.objects.create(
+            #     store=store,
+            #     credit=decoded_data['credit'],
+            #     type=decoded_data['record_type'],
+            # )
+            
+            return Response({
+                'status': 'success',
+                'message': 'Prepay data decoded successfully',
+                'decoded_data': decoded_data
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=400)
+
+
+class PrepayUseHookAPI(APIView):
+    permission_classes = []  # 외부 웹훅 접근을 위해 인증 제외
+    
+    def decode_log_data(self, data: str):
+        # ABI 타입 정의
+        abi_types = [
+            "string",      # store_name
+            "address",     # signer
+            "string",      # record_type
+            "uint256",     # credit
+            "uint256"      # remaining
+        ]
+        
+        # web3 인스턴스 생성
+        w3 = Web3()
+        
+        # 데이터 디코딩
+        try:
+            # 0x 제거 후 디코딩
+            decoded = w3.codec.decode(abi_types, bytes.fromhex(data[2:]))
+            
+            # address 타입에 0x prefix 추가
+            signer_address = f"0x{decoded[1]}"
+            
+            return {
+                'store_name': decoded[0],
+                'signer': signer_address,
+                'record_type': decoded[2],
+                'credit': decoded[3],
+                'remaining': decoded[4]
+            }
+        except Exception as e:
+            raise ValueError(f"Failed to decode data: {str(e)}")
+    
+    def post(self, request):
+        try:
+            data = request.data
+            
+            # 웹훅 데이터 검증
+            if not data.get('event') or not data['event'].get('messages'):
+                raise ValueError("Invalid webhook data format")
+            
+            # 첫 번째 메시지의 데이터 추출
+            message = data['event']['messages'][0]
+            hex_data = message['data']
+            
+            # 데이터 디코딩
+            decoded_data = self.decode_log_data(hex_data)
+            
+            # TODO: 디코딩된 데이터를 사용하여 Prepay 사용 처리
+            # store = Store.objects.get(name=decoded_data['store_name'])
+            # prepay = Prepay.objects.get(store=store, user__wallet_address=decoded_data['signer'])
+            # prepay.credit = decoded_data['remaining']
+            # prepay.save()
+            
+            return Response({
+                'status': 'success',
+                'message': 'Prepay data decoded successfully',
+                'decoded_data': decoded_data
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=400)
