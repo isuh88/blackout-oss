@@ -42,7 +42,10 @@ class MyStoreListAPI(generics.ListAPIView):
 
         return self.queryset.filter(id__in=store_ids)
 
+
 class PrepayIsValidAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def post(self, request):
         data = request.data
         prepay_id = data.get('prepay_id')
