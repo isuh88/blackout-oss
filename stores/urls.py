@@ -16,10 +16,11 @@ Including another URLconf
 """
 from django.urls import path
 
-from stores.views import PublicStoreListAPI, PrivateStoreListAPI, MyStoreListAPI
+from stores.views import PublicStoreListAPI, PrivateStoreListAPI, MyStoreListAPI, PrepayIsValidAPI
 
 urlpatterns = [
     path('public/', PublicStoreListAPI.as_view()),
     path('private/', PrivateStoreListAPI.as_view()),
     path('me/', MyStoreListAPI.as_view()),
+    path('prepay/is_valid/', PrepayIsValidAPI.as_view()),
 ]
