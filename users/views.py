@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from .models import User
-from .serializers import UserSignupSerializer, UserSigninSerializer
+from .serializers import UserSignupSerializer, UserSigninSerializer, UserRetrieveSerializer
 
 
 class UserSignupAPI(generics.CreateAPIView):
@@ -54,7 +54,7 @@ class UserSigninAPI(generics.GenericAPIView):
 
 class UserRetrieveAPI(generics.GenericAPIView):
     queryset = User.objects.all()
-    serializer_class = UserSignupSerializer
+    serializer_class = UserRetrieveSerializer
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
