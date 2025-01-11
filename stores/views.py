@@ -108,18 +108,38 @@ class PrepayAddHookAPI(APIView):
             # 데이터 디코딩
             decoded_data = self.decode_log_data(hex_data)
             
-            # TODO: 디코딩된 데이터를 사용하여 Prepay 객체 생성
-            # store = Store.objects.get(wallet_address=decoded_data['store_address'])
-            # Prepay.objects.create(
-            #     store=store,
-            #     credit=decoded_data['credit'],
-            #     type=decoded_data['record_type'],
-            # )
+            # Store 조회 또는 생성
+            store, store_created = Store.objects.get_or_create(
+                name=decoded_data['store_name'],
+                defaults={
+                    'wallet_address': decoded_data['store_address'],
+                    'address': 'seoul, korea'  # default 값 설정
+                }
+            )
+            
+            # Prepay 레코드 조회 또는 생성
+            prepay, prepay_created = Prepay.objects.get_or_create(
+                store=store,
+                user__wallet_address=decoded_data['signer'],
+                type=decoded_data['record_type'],
+                defaults={
+                    'credit': decoded_data['new_total']
+                }
+            )
+            
+            # 기존 레코드가 있었다면 credit 업데이트
+            if not prepay_created:
+                prepay.credit = decoded_data['new_total']
+                prepay.save()
             
             return Response({
                 'status': 'success',
-                'message': 'Prepay data decoded successfully',
-                'decoded_data': decoded_data
+                'message': 'Prepay data processed successfully',
+                'decoded_data': decoded_data,
+                'action': {
+                    'store': 'created' if store_created else 'existing',
+                    'prepay': 'created' if prepay_created else 'updated'
+                }
             })
             
         except Exception as e:
@@ -178,15 +198,35 @@ class PrepayUseHookAPI(APIView):
             # 데이터 디코딩
             decoded_data = self.decode_log_data(hex_data)
             
-            # TODO: 디코딩된 데이터를 사용하여 Prepay 사용 처리
-            # store = Store.objects.get(name=decoded_data['store_name'])
-            # prepay = Prepay.objects.get(store=store, user__wallet_address=decoded_data['signer'])
-            # prepay.credit = decoded_data['remaining']
-            # prepay.save()
+            # Store 조회
+            try:
+                store = Store.objects.get(name=decoded_data['store_name'])
+            except Store.DoesNotExist:
+                return Response({
+                    'status': 'error',
+                    'message': 'Store not found'
+                }, status=404)
+            
+            # Prepay 레코드 조회
+            try:
+                prepay = Prepay.objects.get(
+                    store=store,
+                    user__wallet_address=decoded_data['signer'],
+                    type=decoded_data['record_type']
+                )
+            except Prepay.DoesNotExist:
+                return Response({
+                    'status': 'error',
+                    'message': 'Prepay record not found'
+                }, status=404)
+            
+            # credit 업데이트
+            prepay.credit = decoded_data['remaining']
+            prepay.save()
             
             return Response({
                 'status': 'success',
-                'message': 'Prepay data decoded successfully',
+                'message': 'Prepay data processed successfully',
                 'decoded_data': decoded_data
             })
             
