@@ -130,12 +130,13 @@ class PrepayAddHookAPI(APIView):
                 }, status=404)
             
             # Prepay 레코드 조회 또는 생성
+            credit = decoded_data['new_total'] / 1000000000000000000
             prepay, prepay_created = Prepay.objects.get_or_create(
                 store=store,
                 user=user,
                 type=decoded_data['record_type'],
                 defaults={
-                    'credit': decoded_data['new_total']
+                    'credit': credit
                 }
             )
             
