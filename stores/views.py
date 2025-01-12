@@ -53,7 +53,10 @@ class PrepayIsValidAPI(APIView):
         prepay_id = data.get('prepay_id')
         code = data.get('code')
 
-        is_valid = Prepay.objects.filter(id=prepay_id, code=code).exists()
+        prepay = Prepay.objects.filter(id=prepay_id, code=code)
+        is_valid = prepay.exists()
+        if is_valid:
+            UserPrepayRelease.objects.create(user=request.user, prepay_id=prepay.first().id)
         return Response({'is_valid': is_valid})
 
 
